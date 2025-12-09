@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Portal - Bulk Dropout Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', Segoe UI, Tahoma, Geneva, Verdana, sans-serif; background: #f1f3f7; color: #183153; }
+        .header-gov { background: #194179; color: #fff; padding: 18px 0; text-align: center; box-shadow: 0 2px 6px rgba(35,54,134,0.1); }
+        .header-gov h1 { margin: 0; font-size: 23px; font-weight: 700; letter-spacing: 1px; }
+        .container { max-width: 1100px; margin: 24px auto 0 auto; padding: 0 16px; }
+        .card { background: #fff; border: 1.5px solid #bcd0ee; border-radius: 7px; padding: 20px 18px; box-shadow: 0 2px 8px 0 rgba(110,123,174,0.05); }
+        h1, h2, h3 { font-weight: 700; }
+        h2 { font-size: 19px; color: #194179; margin-bottom: 13px; }
+        .card-header-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .subtitle { color: #344766; margin-bottom: 20px; font-size: 15px; }
+        .uploader { border: 1.5px dashed #2f5597; border-radius: 7px; padding: 16px; text-align: center; background: #f8fafc; }
+        .btn { background: #194179; color: #fff; border: 0; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; letter-spacing: 1px; margin-top: 5px; transition: background 0.15s; }
+        .btn:disabled { opacity: .6; cursor: not-allowed; }
+        .btn:hover { background: #15315b; }
+        input[type=file] { margin-top: 8px; padding: 3px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 18px; background: #fff; border: 1.3px solid #cbd5e1; border-radius: 4px; font-size: 15px; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e3e6eb; vertical-align: middle; }
+        th { background: #e3eefe; font-weight: 700; color: #194179; font-size: 15px; border-bottom: 2px solid #bcd0ee; cursor: default; }
+        th[onclick] { cursor:pointer; user-select:none; }
+        .badge { padding: 2px 12px; border-radius: 999px; font-size: 13px; color: #fff; font-weight: 700; border: none; }
+        .green { background: #50ab4f; }
+        .orange { background: #ff9500; }
+        .red { background: #e03738; }
+        .pagination-area { margin: 17px 0 5px 0; text-align: center; }
+        .modal { position: fixed; inset: 0; background: rgba(30,52,100,0.19); display: none; align-items: center; justify-content: center; z-index: 100; }
+        .modal-content { background: #f4f7fb; min-width: 340px; width: 520px; max-width: 98%; border: 1px solid #bcd0ee; border-radius: 10px; padding: 24px 22px 20px 22px; box-shadow: 0 8px 32px 2px rgba(76,98,179,0.13); position: relative; }
+        .close { position: absolute; top: 13px; right: 15px; cursor: pointer; color: #30569e; font-size: 26px; font-weight: 700; z-index: 2; padding: 5px; line-height: 1; }
+        .dashboard-header { display: flex; flex-direction: row; align-items: center; gap: 16px; margin-bottom: 16px; }
+        .student-info { font-size: 17px; font-weight: 700; }
+        .risk-banner { padding: 12px 18px; border-radius: 7px; margin: 0 0 8px 0; color: #fff; font-size: 18px; font-weight: 700; letter-spacing: 1px; display: inline-block; }
+        .risk-banner.green { background: #50ab4f; }
+        .risk-banner.orange { background: #ff9500; }
+        .risk-banner.red { background: #e03738; }
+        .risk-jumbo { font-size: 2.6em; font-weight: 700; color: #194179; margin: 2px 0 2px 0; }
+        .risk-bar-h { width: 100%; height: 19px; border-radius: 9px; overflow: hidden; background: #e3e6eb; margin: .2em 0 1.2em 0; }
+        .risk-bar-fill { height: 100%; border-radius: 9px; transition: width .3s; }
+        .risk-bar-fill.green { background: #50ab4f; }
+        .risk-bar-fill.orange { background: #ff9500; }
+        .risk-bar-fill.red { background: #e03738; }
+        .features-section { margin: 12px 0; }
+        .features-list { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+        .feature-box { background: #e3eefe; border-radius: 7px; padding: 11px 18px 9px 11px; font-size: 15px; color: #163973; display: flex; align-items: center; gap: 7px; box-shadow: 0 1px 3px rgba(78,122,204,.05); font-weight: 600; min-width: 130px; }
+        .feature-emoji { font-size: 1.3em; width: 1.7em; text-align: center; opacity: 0.93; }
+        .hint { color: #355093; font-size: 13px; margin-bottom: 10px; display: block; }
+        .error { background: #fbeeeb; color: #b13223; padding: 10px 14px; border-radius: 6px; margin-top: 12px; border: 1px solid #ecb3ad; }
+        @media (max-width: 620px) {
+            .container { padding: 2px; }
+            .card { padding: 7px 5px; }
+            .modal-content { min-width: 0; width: 99vw; padding: 12px 5px; }
+        }
+    </style>
+    <script>
+        const API_BASE = 'http://localhost:8001/api/v1';
+        let lastResults = [];
+        let displayResults = [];
+        let currentPage = 1;
+        let pageSize = 10;
+        let sortAsc = false; // false: มาก->น้อย, true: น้อย->มาก
+        let sortKey = 'risk'; // 'risk' | 'student_id'
+
+        function exampleTemplate() {
+            const cols = [
+                'student_id','name','faculty','gender','gpax','count_f',
+                'year1_term1','year1_term2','year2_term1','year2_term2',
+                'year3_term1','year3_term2','year4_term1','year4_term2',
+                'year5_term1','year5_term2'
+            ];
+            const csv = cols.join(',') + '\n';
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'template.csv'; a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function uploadAndAnalyze() {
+            const input = document.getElementById('file');
+            const btn = document.getElementById('analyzeBtn');
+            const err = document.getElementById('error');
+            err.textContent = '';
+            if (!input.files || !input.files[0]) { err.textContent = 'กรุณาเลือกไฟล์ CSV/XLSX'; return; }
+            const form = new FormData();
+            form.append('file', input.files[0]);
+            btn.disabled = true; btn.textContent = 'กำลังวิเคราะห์...';
+            try {
+                const res = await fetch(`${API_BASE}/batch-predict`, { method: 'POST', body: form });
+                if (!res.ok) { throw new Error(await res.text()); }
+                const data = await res.json();
+                lastResults = data.results || [];
+                currentPage = 1;
+                sortAsc = false;
+                doSortAndDisplay();
+            } catch (e) {
+                err.textContent = 'ข้อผิดพลาด: ' + e.message;
+            } finally {
+                btn.disabled = false; btn.textContent = 'วิเคราะห์';
+            }
+        }
+
+        function doSortAndDisplay() {
+            // Clone and sort
+            displayResults = [...lastResults];
+            if (sortKey === 'risk') {
+                displayResults.sort((a, b) => sortAsc ? (a.dropout_probability - b.dropout_probability) : (b.dropout_probability - a.dropout_probability));
+            } else if (sortKey === 'student_id') {
+                const toNum = (v) => {
+                    if (!v) return Number.NEGATIVE_INFINITY;
+                    const m = String(v).replace(/\D/g, '');
+                    return m ? parseInt(m, 10) : Number.NEGATIVE_INFINITY;
+                };
+                displayResults.sort((a, b) => {
+                    const av = toNum(a.student_id);
+                    const bv = toNum(b.student_id);
+                    return sortAsc ? (av - bv) : (bv - av);
+                });
+            }
+            renderTable();
+            renderPagination();
+            updateSortIndicators();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tbody');
+            let startIdx = (currentPage-1)*pageSize, endIdx = startIdx+pageSize;
+            let paged = displayResults.slice(startIdx, endIdx);
+            tbody.innerHTML = paged.map((r, i) => `
+                <tr>
+                    <td>${r.student_id ?? ''}</td>
+                    <td>${r.name ?? ''}</td>
+                    <td>${r.prediction_label}</td>
+                    <td>${(r.dropout_probability * 100).toFixed(1)}%</td>
+                    <td><span class="badge ${r.risk_color === 'green' ? 'green' : r.risk_color === 'orange' ? 'orange' : 'red'}">${r.risk_level}</span></td>
+                    <td><button class="btn" onclick="openDetail(${startIdx+i})">ดูรายละเอียด</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPagination() {
+            let total = displayResults.length;
+            let totalPages = Math.ceil(total/pageSize);
+            const cont = document.getElementById('pagination-controls');
+            if (totalPages <= 1) { cont.innerHTML = ''; return; }
+            let html = '';
+            html += `<button class="btn" onclick="gotoPage(1)" ${currentPage===1?'disabled':''}>หน้าแรก</button>`;
+            html += `<button class="btn" onclick="gotoPage(${currentPage-1})" ${currentPage===1?'disabled':''}>ก่อนหน้า</button>`;
+            html += ` <span>หน้าที่ ${currentPage} / ${totalPages}</span> `;
+            html += `<button class="btn" onclick="gotoPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>ถัดไป</button>`;
+            html += `<button class="btn" onclick="gotoPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>หน้าสุดท้าย</button>`;
+            cont.innerHTML = html;
+        }
+
+        function gotoPage(page) {
+            let totalPages = Math.ceil(displayResults.length/pageSize);
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            renderTable();
+            renderPagination();
+        }
+
+        function openDetail(idx) {
+            const r = displayResults[idx];
+            const modal = document.getElementById('modal');
+            const content = document.getElementById('modal-content');
+            const kv = r.feature_explanations || {};
+            const badgeMap = {
+                green: 'ต่ำ', orange: 'ปานกลาง', red: 'สูง'
+            };
+            // Emoji for features
+            function getFeatEmoji(k, v) {
+                if(k.includes('GPA')||k.includes('เกรด')) return "📊";
+                if(k.match(/F|F:/)) return "🅵";
+                if(k.match(/เตือน|warning/i)) return "⚠️";
+                if(k.includes('ต่ำ')) return "⬇️";
+                if(k.includes('สูง')) return "⬆️";
+                if(k.includes('แนวโน้ม')) return "📈";
+                return "🔎";
+            }
+            // Card header
+            let infoHead = `
+            <div class="dashboard-header">
+                <div style="flex:1;">
+                    <div class="student-info">
+                        ${r.name ? `<span>${r.name}</span>` : ''} ${(r.student_id ? '('+r.student_id+')' : '')}
+                    </div>
+                </div>
+            </div>
+            <div style="margin-bottom:9px;">
+                <span class="risk-banner ${r.risk_color}">
+                    ${badgeMap[r.risk_color] ?? r.risk_level} (${(r.dropout_probability*100).toFixed(1)}%)
+                </span>
+            </div>
+            <div style="margin-bottom:5px;">
+                <div class="risk-bar-h"><div class="risk-bar-fill ${r.risk_color}" style="width:${(r.dropout_probability*100).toFixed(1)}%"></div></div>
+                <div class="risk-jumbo">${(r.dropout_probability*100).toFixed(1)}%</div>
+            </div>
+            `;
+            // Feature cards
+            let feats = Object.entries(kv).map(([k,v]) =>
+                `<div class="feature-box"><span class="feature-emoji">${getFeatEmoji(k, v)}</span> ${v}</div>`
+            ).join('');
+            feats = feats ? `<div class="features-list">${feats}</div>` : '<span class="hint">ไม่พบฟีเจอร์สำคัญ</span>';
+            // Modal content
+            content.innerHTML = `
+                <span class="close" onclick="closeModal()">✖</span>
+                ${infoHead}
+                <div class="features-section">
+                    <span class="hint">สาเหตุสำคัญจากฟีเจอร์ที่กระทบต่อผลการประเมิน:</span>
+                    ${feats}
+                </div>
+            `;
+            modal.style.display = 'flex';
+        }
+        function closeModal(){ document.getElementById('modal').style.display = 'none'; }
+
+        // Sorting handlers
+        function sortBy(key) {
+            if (sortKey === key) {
+                sortAsc = !sortAsc;
+            } else {
+                sortKey = key;
+                sortAsc = (key === 'student_id'); // default asc for IDs
+            }
+            currentPage = 1;
+            doSortAndDisplay();
+        }
+
+        function updateSortIndicators() {
+            const riskArrow = document.getElementById('riskSortArrow');
+            const sidArrow = document.getElementById('sidSortArrow');
+            if (riskArrow) riskArrow.textContent = (sortKey === 'risk') ? (sortAsc ? '▲' : '▼') : '';
+            if (sidArrow) sidArrow.textContent = (sortKey === 'student_id') ? (sortAsc ? '▲' : '▼') : '';
+        }
+    </script>
+</head>
+<body>
+    <div class="header-gov">
+        <h1>Teacher Portal: ระบบวิเคราะห์ความเสี่ยง Dropout นักศึกษา</h1>
+    </div>
+    <div class="container">
+        <div class="card">
+            <div class="card-header-line">
+                <h2 style="margin-bottom:0;">นำเข้าไฟล์ข้อมูลนักศึกษา</h2>
+                <button class="btn" onclick="exampleTemplate()">ดาวน์โหลดเทมเพลต CSV</button>
+            </div>
+            <div class="subtitle">อัปโหลดไฟล์ <b>CSV/XLSX</b> วิเคราะห์ผลความเสี่ยงได้ทีละกลุ่ม เหมาะกับงานราชการ หรือการประเมินกลุ่มใหญ่</div>
+            <div class="uploader">
+                <input id="file" type="file" accept=".csv,.xlsx" />
+                <br/>
+                <button id="analyzeBtn" class="btn" onclick="uploadAndAnalyze()">วิเคราะห์</button>
+                <div id="error" class="error"></div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th onclick="sortBy('student_id')">รหัสนักศึกษา <span id="sidSortArrow"></span></th>
+                        <th>ชื่อ</th>
+                        <th>ผลทำนาย</th>
+                        <th onclick="sortBy('risk')">ความเสี่ยง <span id="riskSortArrow"></span></th>
+                        <th>ระดับ</th>
+                        <th>รายละเอียด</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody"></tbody>
+            </table>
+            <div id="pagination-controls" class="pagination-area"></div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal" onclick="closeModal()">
+        <div id="modal-content" class="modal-content" onclick="event.stopPropagation()"></div>
+    </div>
+</body>
+</html>
+
+
